@@ -39,6 +39,7 @@
           <ul class="nav navbar-nav">
             <li id='order'><a href="/order">Order</a></li>
             <li id='kline'><a href="/kline">Kline</a></li>
+            <li id='analysis'><a href="/analysis">Analysis</a></li>
             <li id='download'><a href="/download">Download</a></li>
           </ul>
           <ul class="nav navbar-nav navbar-right">

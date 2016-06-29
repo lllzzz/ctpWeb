@@ -59,6 +59,7 @@ Route::group(['middleware' => 'auth'], function() {
         $data['krange'] = min($range);
         $data['index'] = $index;
         $data['dateTime'] = $dateTime;
+        // $index[] = -1;
 
         $inSQL = implode(',', $index);
         $sql = "SELECT
@@ -68,6 +69,7 @@ Route::group(['middleware' => 'auth'], function() {
             `order` as o
         WHERE
             m.order_id = o.order_id
+            and m.instrumnet_id = o.instrumnet_id
             AND m.`instrumnet_id` = '{$iID}'
             AND m.`kindex` in ({$inSQL})
             AND m.`krange` = {$krange}
@@ -78,7 +80,10 @@ Route::group(['middleware' => 'auth'], function() {
             $data['error'] = 2;
             return view('ctp.kline', $data);
         }
+
         // 交易盈亏
+        $minKline = $kline[0]->index;
+        $maxKline = $kline[count($kline) - 1]->index;
         $orderData = [];
         $orderMap = [];
         $i = 0;
@@ -102,8 +107,6 @@ Route::group(['middleware' => 'auth'], function() {
                 $i++;
             }
         }
-        $minKline = $kline[0]->index;
-        $maxKline = $kline[count($kline) - 1]->index;
         $cPrice[] = 0;
         foreach ($orderData as &$item) {
             if (isset($item['open_kindex'])) {
@@ -111,19 +114,32 @@ Route::group(['middleware' => 'auth'], function() {
             } else {
                 $min = $item['close_kindex'] - $minKline;
             }
+            $middle = 0;
+            if (isset($item['open_kindex']) && isset($item['close_kindex'])) {
+                $middle = $item['close_kindex'] - $item['open_kindex'];
+            }
             for ($i = 0; $i < $min; $i++) {
                 $item['data'][] = '"-"';
             }
             if (isset($item['open_price'])) $item['data'][] = $item['open_price'];
+            for ($i=1; $i < $middle; $i++) {
+                $item['data'][] = $item['open_price'] + $i * ($item['close_price'] - $item['open_price']) / $middle;
+            }
             if (isset($item['close_price'])) $item['data'][] = $item['close_price'];
 
             if (isset($item['open_price']) && isset($item['close_price'])) {
-                while (count($cPrice) < $item['close_kindex'] - $minKline) {
+                while (count($cPrice) <= $item['open_kindex'] - $minKline) {
                     $cPrice[] = end($cPrice);
                 }
                 $change = $item['open_price'] - $item['close_price'];
                 $change = $item['open_is_buy'] ? $change * -1 : $change;
-                $cPrice[] = end($cPrice) + $change;
+                $col = $item['close_kindex'] - $item['open_kindex'];
+                $col = $col == 0 ? 1 : $col;
+                $oneChange = $change / $col;
+                for ($i=0; $i < $col; $i++) {
+                    $cPrice[] = end($cPrice) + $oneChange;
+                }
+
             }
         }
         while (count($cPrice) < $maxKline - $minKline + 1) {
@@ -139,7 +155,7 @@ Route::group(['middleware' => 'auth'], function() {
 
     Route::get('order/{order?}', function($order = null) {
         $page = isset($_GET['p']) ? intval($_GET['p']) : 1;
-        list($data['list'], $totalPage, $data['pl']) = Order::getAll($page);
+        list($data['list'], $totalPage, $data['pl']) = (new Order)->getAll($page);
         $data['pre'] = $page == 1 ? 1 : $page - 1;
         $data['next'] = $page == $totalPage ? $page : $page + 1;
         // return $data;
@@ -160,8 +176,8 @@ Route::group(['middleware' => 'auth'], function() {
 
         if ($type == 'order') {
 
-            $title = ['订单号', '系统单号', '合约', 'K线索引', '买卖', '开平', '订单类型', '报单时间', '最后成交时间/撤单时间', '报单价格', '成交价格', '报单手数', '未成交手数', '盈亏', '手续费', '系统响应耗时', '订单成交耗时', '详细状态'];
-            list($list, $_) = Order::getAll(0, $start, $end, $iID, $range);
+            $title = ['订单号', '系统单号', '合约', 'K线索引', 'K线幅值', '买卖', '开平', '订单类型', '报单时间', '最后成交时间/撤单时间', '报单价格', '成交价格', '报单手数', '未成交手数', '盈亏', '手续费', '系统响应耗时', '订单成交耗时', '详细状态'];
+            list($list, $_) = (new Order)->getAll(0, $start, $end, $iID, $range);
             array_unshift($list, $title);
         }
 
@@ -201,6 +217,161 @@ Route::group(['middleware' => 'auth'], function() {
         }
         fclose($fp);
         header("Location: /runtime/{$file}.csv");
+    });
+
+    Route::get('analysis', function() {
+        $start = isset($_GET['startTime']) ? $_GET['startTime'] : date('Y-m-d H:i', strtotime('-1 day'));
+        $end = isset($_GET['endTime']) ? $_GET['endTime'] : date('Y-m-d H:i');
+        $minStart = '2016-06-29 09:00';
+        if (strtotime($start) < strtotime($minStart)) $start = $minStart;
+        $data['start'] = $start;
+        $data['end'] = $end;
+        list($list) = (new Order)->getAll(0, $start, $end);
+        $fList = [];
+        $analysis = [];
+        foreach ($list as $item) {
+            if (!isset($analysis["{$item[2]}_{$item[4]}"])) $analysis["{$item[2]}_{$item[4]}"] = [];
+            $tmp = [
+                'iid' => $item[2],
+                'kindex' => $item[3],
+                'krange' => $item[4],
+                'is_buy' => $item[5] == 'buy' ? true : false,
+                'is_open' => $item[6] == 'kai' ? true : false,
+                'price' => $item[10],
+                'real_price' => $item[11],
+                'status' => $item[18] == '撤单' ? 2 : 1,
+            ];
+            switch ($item[7]) {
+                case '预测单':
+                    $tmp['type'] = 0;
+                    break;
+                case '强平单':
+                    $tmp['type'] = 3;
+                    break;
+                case '追价单':
+                    $tmp['type'] = 2;
+                    break;
+                case '实时单':
+                    $tmp['type'] = 1;
+                    break;
+
+                default:
+                    # code...
+                    break;
+            }
+            $fList[] = $tmp;
+        }
+        $isOpened = [];
+        $openItem = [];
+        foreach ($fList as $item) {
+            $iid = "{$item['iid']}_{$item['krange']}";
+            if ($analysis[$iid] === []) {
+                $analysis[$iid]['total'] = 0;
+                $analysis[$iid]['type_0'] = 0;
+                $analysis[$iid]['type_1'] = 0;
+                $analysis[$iid]['type_2'] = 0;
+                $analysis[$iid]['type_3'] = 0;
+                $analysis[$iid]['group'] = 0;
+                $analysis[$iid]['forecast_open'] = 0;
+                $analysis[$iid]['forecast_open_ok'] = 0;
+                $analysis[$iid]['real_open'] = 0;
+                $analysis[$iid]['real_open_ok'] = 0;
+                $analysis[$iid]['forecast_close'] = 0;
+                $analysis[$iid]['forecast_close_ok'] = 0;
+                $analysis[$iid]['real_close'] = 0;
+                $analysis[$iid]['real_close_ok'] = 0;
+                $analysis[$iid]['totalPrice'] = 0;
+                $openItem[$iid] = [];
+            }
+            // 总下单
+            $analysis[$iid]['total']++;
+            // 各类下单
+            $analysis[$iid]['type_' . $item['type']]++;
+            // 平开组合
+            if ($item['status'] == 1) {
+                if ($item['is_open']) {
+                    $isOpened[$iid] = true;
+                    $openItem[$iid] = $item;
+                }
+                else {
+                    if (isset($isOpened[$iid]) && $isOpened[$iid])
+                        $analysis[$iid]['group']++;
+                    $isOpened[$iid] = false;
+                    $p = $item['real_price'] - $openItem[$iid]['real_price'];
+                    $p = $item['is_buy'] ? -$p : $p;
+                    $analysis[$iid]['totalPrice'] += $p * Order::$priceRadio[$item['iid']];
+                }
+            }
+            // 每根K线操作，用于计算详细
+            $analysis[$iid]['kindex'][$item['kindex']][] = $item;
+        }
+        foreach ($analysis as $iid => $item) {
+            foreach ($item['kindex'] as $key => $detail) {
+                // 当前操作是否是方向正确的
+                $is_right = false;
+                $is_double_open = false;
+                if (count($detail) > 2) $is_right = true;
+                else if (count($detail) == 2) {
+                    if ($detail[0]['is_open'] && $detail[1]['is_open']) {
+                        $is_right = true;
+                        $is_double_open = true;
+                    }
+                    else if ($detail[0]['status'] == 1 || $detail[1]['status'] == 1) $is_right = true;
+                } else {
+                    if ($detail[0]['is_open']) $is_right = true;
+                    else if ($detail[0]['status'] == 1) $is_right = true;
+                }
+                if ($is_right) {
+                    foreach ($detail as $one) {
+                        if ($one['is_open'] && $one['type'] == 0) {
+                            if ($is_double_open) {
+                                $is_double_open = false;
+                            } else {
+                                $analysis[$iid]['forecast_open']++;
+                            }
+                            if ($one['status'] == 1) $analysis[$iid]['forecast_open_ok']++;
+                        }
+                        if ($one['is_open'] && $one['type'] != 0) {
+                            $analysis[$iid]['real_open']++;
+                            if ($one['status'] == 1) $analysis[$iid]['real_open_ok']++;
+                        }
+                        if (!$one['is_open'] && $one['type'] == 0) {
+                            $analysis[$iid]['forecast_close']++;
+                            if ($one['status'] == 1) $analysis[$iid]['forecast_close_ok']++;
+                        }
+                        if (!$one['is_open'] && $one['type'] != 0) {
+                            $analysis[$iid]['real_close']++;
+                            if ($one['status'] == 1) $analysis[$iid]['real_close_ok']++;
+                        }
+                    }
+                }
+                unset($analysis[$iid]['kindex']);
+            }
+        }
+        $fAnalysis = [];
+        foreach ($analysis as $iid => $line) {
+            $tmp = [];
+            $tmp[] = $iid;
+            $tmp[] = $line['total'];
+            $tmp[] = $line['group'];
+            $tmp[] = $line['totalPrice'];
+            $tmp[] = $line['group'] > 0 ?  number_format($line['totalPrice'] / $line['group'], 2) : '-';
+            $tmp[] = $line['type_0'];
+            $tmp[] = $line['type_1'];
+            $tmp[] = $line['type_2'];
+            $tmp[] = $line['type_3'];
+            $p = $line['forecast_open'] > 0 ? number_format($line['forecast_open_ok'] / $line['forecast_open'], 3) * 100 . "%" : "-";
+            $tmp[] = "{$line['forecast_open']} / {$line['forecast_open_ok']} / {$p}";
+            $p = $line['real_open'] > 0 ? number_format($line['real_open_ok'] / $line['real_open'], 3) * 100 . "%" : "-";
+            $tmp[] = "{$line['real_open']} / {$line['real_open_ok']} / {$p}";
+            $p = $line['forecast_close'] > 0 ? number_format($line['forecast_close_ok'] / $line['forecast_close'], 3) * 100 . "%" : "-";
+            $tmp[] = "{$line['forecast_close']} / {$line['forecast_close_ok']} / {$p}";
+            $p = $line['real_close'] > 0 ? number_format($line['real_close_ok'] / $line['real_close'], 3) * 100 . "%" : "-";
+            $tmp[] = "{$line['real_close']} / {$line['real_close_ok']} / {$p}";
+            $fAnalysis[] = $tmp;
+        }
+        $data['list'] = $fAnalysis;
+        return view('ctp.analysis', $data);
     });
 
 });

@@ -10,19 +10,23 @@ class Order extends Model
     //
     private static $db = 'ctp_1';
 
-    private static $commission = [
+    public static $commission = [
         'sn1609' => 3.9,
         'hc1610' => 5.12,
-        'SR609' => 1,
+        'SR609' => 3.1,
+        'zn1608' => 3.1,
+        'cu1608' => 9.5,
     ];
 
-    private static $priceRadio = [
+    public static $priceRadio = [
         'sn1609' => 1,
         'hc1610' => 10,
         'SR609' => 10,
+        'zn1608' => 5,
+        'cu1608' => 5,
     ];
 
-    public static function getAll($page = 1, $start = null, $end = null, $iID = null, $range = null)
+    public function getAll($page = 1, $start = null, $end = null, $iID = null, $range = null)
     {
         if (empty($start)) {
             $today = date('Y-m-d', time());
@@ -48,7 +52,7 @@ class Order extends Model
         $end = $end;
 
         $sql = "SELECT
-            m.order_id, m.instrumnet_id, m.kindex, o.is_buy, o.is_open, m.is_forecast, m.is_zhuijia, o.srv_insert_time, o.srv_traded_time, o.start_time, o.start_usec, o.first_time, o.first_usec, o.end_time, o.end_usec, o.price, o.real_price, m.cancel_type, o.status, o.session_id, o.front_id, o.order_ref, o.cancel_tick_price
+            m.order_id, m.instrumnet_id, m.kindex, m.krange, o.is_buy, o.is_open, m.is_forecast, m.is_zhuijia, o.srv_insert_time, o.srv_traded_time, o.start_time, o.start_usec, o.first_time, o.first_usec, o.end_time, o.end_usec, o.price, o.real_price, m.cancel_type, o.status, o.session_id, o.front_id, o.order_ref, o.cancel_tick_price
         FROM
             markov_kline_order as m,
             `order` as o
@@ -83,9 +87,10 @@ class Order extends Model
             $tmp[] = "{$line->front_id}:{$line->session_id}:{$line->order_ref}";
             $tmp[] = $line->instrumnet_id;
             $tmp[] = $line->kindex;
+            $tmp[] = $line->krange;
             $tmp[] = $line->is_buy ? 'buy' : 'sell';
             $tmp[] = $line->is_open ? 'kai' : 'ping';
-            $tmp[] = $line->is_forecast ? ($line->kindex == -1 ? '强平单' : '预测单') : ($line->is_zhuijia ? '追价单' : '实时单');
+            $tmp[] = $line->is_forecast ? '预测单' : ($line->is_zhuijia ? '追价单' : ($line->kindex == -1 ? '强平单' : '实时单'));
             $tmp[] = $line->start_time;
             $tmp[] = $line->end_time;
             $tmp[] = $line->price;
@@ -133,15 +138,15 @@ class Order extends Model
         }
 
         $total = count($report);
-        $totalPage = ceil($total / 20);
+        $totalPage = ceil($total / 40);
         $profitorLoss = ['total' => 0];
         if ($page > 0) {
             $report = array_reverse($report);
-            $start = ($page - 1) * 20;
+            $start = ($page - 1) * 40;
             $unkown = [];
             foreach ($report as $key => $item) {
-                $profitorLoss['total'] = isset($profitorLoss['total']) ? $profitorLoss['total'] + $item[13] : $item[13];
-                $profitorLoss[$item[2]] = isset($profitorLoss[$item[2]]) ? $profitorLoss[$item[2]] + $item[13] : $item[13];
+                $profitorLoss['total'] = isset($profitorLoss['total']) ? $profitorLoss['total'] + $item[14] : $item[14];
+                $profitorLoss[$item[2]] = isset($profitorLoss[$item[2]]) ? $profitorLoss[$item[2]] + $item[14] : $item[14];
                 if ($item[count($item) - 1] == '未知') {
                     $item[count($item) - 2] = '-';
                     $unkown[] = $item;
@@ -149,7 +154,7 @@ class Order extends Model
                 }
             }
             $report = array_merge($unkown, $report);
-            $report = array_slice($report, $start, 20);
+            $report = array_slice($report, $start, 40);
         }
 
         return [$report, $totalPage, $profitorLoss];

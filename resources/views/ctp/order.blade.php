@@ -23,7 +23,7 @@
     <table class="table table-striped">
       <thead>
         <tr>
-          <th>单号</th> <th>合约</th> <th>K线</th> <th>买卖</th> <th>开平</th> <th>类型</th> <th>报单时间</th> <th>成交/撤单时间</th> <th>报单价格</th> <th>成交价格</th> <th>报单手数</th> <th>未成交手数</th> <th>盈亏</th> <th>响应耗时</th> <th>成交耗时</th> <th>详细状态<th>
+          <th>单号</th> <th>合约</th> <th>K线</th> <th>幅值</th> <th>买卖</th> <th>开平</th> <th>类型</th> <th>报单时间</th> <th>成交/撤单时间</th> <th>报单价格</th> <th>成交价格</th> <th>报单手数</th> <th>未成交手数</th> <th>盈亏</th> <th>响应耗时</th> <th>成交耗时</th> <th>详细状态<th>
         </tr>
       </thead>
       <tbody>
@@ -31,7 +31,7 @@
         <tr>
             {{-- <th scope="row">{{ $line[0] }}</th> --}}
             @foreach ($line as $i => $item)
-                <?php if (in_array($i, [1, 14])) continue; ?>
+                <?php if (in_array($i, [1, 15])) continue; ?>
                 <td>{{ $item }}</td>
             @endforeach
         </tr>

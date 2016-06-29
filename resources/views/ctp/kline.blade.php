@@ -25,13 +25,11 @@
 <br>
 
 <script src="/js/echart.js"></script>
-<script src="/js/dark.js"></script>
-@if (isset($error) && $error == 1)
-    <h5>该参数没有K线</h5>
-@else
-<div id="main" style="width: 100%;height:400px;"></div>
-<div id="main2" style="width: 100%;height:400px;"></div>
+{{-- <script src="/js/vintage.js"></script> --}}
 <script>
+    var nowiID = '{{$iID}}',
+        nowRange = {{$r}};
+
     var iIDRange = {
         'sn1609': [80],
         'SR609': [6],
@@ -42,11 +40,11 @@
 
     for (iID in iIDRange) {
 
-        if (iID == 'sn1609') {
+        if (iID == nowiID) {
             $('#instrumnet').append('<option value="' + iID + '" selected>' + iID + '</option>');
             var ranges = iIDRange[iID];
             for (var i = 0; i < ranges.length; i++) {
-                if (i == 0) $('#range').append('<option value="' + iIDRange[iID][i] + '" selected>' + iIDRange[iID][i] + '</option>');
+                if (iIDRange[iID][i] == nowRange) $('#range').append('<option value="' + iIDRange[iID][i] + '" selected>' + iIDRange[iID][i] + '</option>');
                 else $('#range').append('<option value="' + iIDRange[iID][i] + '">' + iIDRange[iID][i] + '</option>');
             }
         } else {
@@ -56,13 +54,18 @@
 
     $('#instrumnet').change(function() {
         var iID = $('#instrumnet option:selected').val();
-        console.log(iID);
         var ranges = iIDRange[iID];
         $('#range').empty();
         for (var i = 0; i < ranges.length; i++)
             $('#range').append('<option value="' + iIDRange[iID][i] + '">' + iIDRange[iID][i] + '</option>');
     })
-
+</script>
+@if (isset($error) && $error == 1)
+    <h5>该参数没有K线</h5>
+@else
+<div id="main" style="width: 100%;height:400px;"></div>
+<div id="main2" style="width: 100%;height:400px;"></div>
+<script>
     var klineInfo = {
         @foreach ($dateTime as $k => $t)
         {{$k}}: '{{$t}}',
