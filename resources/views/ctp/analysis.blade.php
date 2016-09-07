@@ -17,7 +17,9 @@
     <input name="endTime" class="form-control form_datetime" style="width: 140px;" type="text" value="{{ $end }}" readonly>
     &nbsp;
   </div>
-  <button type="submit" class="btn btn-default">Analysis</button>
+  <button type="submit" id="btn" class="btn btn-default">Show By Time</button>
+  <button type="submit" id="all_btn" class="btn btn-default">Show All</button>
+  <input type="hidden" name="all" value="0" id="all">
 </form>
 <br>
 
@@ -44,5 +46,11 @@
 
 <script type="text/javascript">
     $(".form_datetime").datetimepicker({format: 'yyyy-mm-dd hh:ii'});
+    $('#btn').click(function() {
+      $('#all').val(0);
+    })
+    $('#all_btn').click(function() {
+      $('#all').val(1);
+    })
 </script>
 @stop

@@ -3,7 +3,8 @@
 @section('action', 'kline')
 
 @section('content')
-
+<link rel="stylesheet" type="text/css" href="http://www.bootcss.com/p/bootstrap-datetimepicker/bootstrap-datetimepicker/css/datetimepicker.css">
+<script src="http://www.bootcss.com/p/bootstrap-datetimepicker/bootstrap-datetimepicker/js/bootstrap-datetimepicker.min.js"></script>
 <form class="form-inline" method="GET">
   <div class="form-group">
     <label for="startTime" class="control-label">Instrumnet:</label>
@@ -15,28 +16,35 @@
     <select class="form-control" id="range" name="r" style="width: 140px;"></select>
     &nbsp;
   </div>
+  <br><br>
   <div class="form-group">
     <label for="startTime" class="control-label">Length:</label>
     <input type="text" class="form-control" style="width: 140px;" name="l" value="{{$l}}">
     &nbsp;
   </div>
-  <button type="submit" class="btn btn-default">Show</button>
+  <button type="submit" class="btn btn-default" id="btn_l">Show By Length</button>
+  <br><br>
+  <div class="form-group">
+    <label for="startTime" class="control-label">Start Time:</label>
+    <input name="startTime" class="form-control form_datetime" style="width: 140px;" type="text" value="{{ $start }}" readonly>
+    &nbsp;
+  </div>
+  <div class="form-group">
+    <label for="startTime" class="control-label">Stop Time:</label>
+    <input name="endTime" class="form-control form_datetime" style="width: 140px;" type="text" value="{{ $end }}" readonly>
+    &nbsp;
+  </div>
+  <button type="submit" class="btn btn-default" id="btn_t">Show By Time</button>
+  <input type="hidden" name="type" value="l" id="type">
 </form>
 <br>
 
 <script src="/js/echart.js"></script>
+<script src="/js/config.js"></script>
 {{-- <script src="/js/vintage.js"></script> --}}
 <script>
     var nowiID = '{{$iID}}',
         nowRange = {{$r}};
-
-    var iIDRange = {
-        'sn1609': [80],
-        'SR609': [6],
-        'cu1608': [60],
-        'hc1610': [8],
-        'zn1608': [30],
-    };
 
     for (iID in iIDRange) {
 
@@ -66,6 +74,15 @@
 <div id="main" style="width: 100%;height:400px;"></div>
 <div id="main2" style="width: 100%;height:400px;"></div>
 <script>
+    $(".form_datetime").datetimepicker({format: 'yyyy-mm-dd hh:ii'});
+
+    $('#btn_t').click(function() {
+      $('#type').val('t');
+    })
+    $('#btn_l').click(function() {
+      $('#type').val('l');
+    })
+
     var klineInfo = {
         @foreach ($dateTime as $k => $t)
         {{$k}}: '{{$t}}',
@@ -129,28 +146,12 @@
                 name: '涨',
                 type: 'bar',
                 stack: '总量',
-                @if ($l <= 50)
-                label: {
-                    normal: {
-                        show: true,
-                        position: 'top'
-                    }
-                },
-                @endif
                 data: [<?php echo htmlspecialchars_decode(implode(',', $up )) ?>]
             },
             {
                 name: '跌',
                 type: 'bar',
                 stack: '总量',
-                @if ($l <= 50)
-                label: {
-                    normal: {
-                        show: true,
-                        position: 'top'
-                    }
-                },
-                @endif
                 data: [<?php echo htmlspecialchars_decode(implode(',', $down )) ?>]
             },
             @if (!isset($error) || $error != 2)

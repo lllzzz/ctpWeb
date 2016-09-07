@@ -20,7 +20,114 @@ Route::get('/', function () {
 
 Route::group(['middleware' => 'auth'], function() {
 
+    Route::get('changeDB', function() {
+        $db = $_GET['db'];
+        $cmd = "cp /home/dev/source/ctpWeb/.env_{$db} /home/dev/source/ctpWeb/.env";
+        system($cmd);
+    });
+
+    Route::get('config', function() {
+        $res = parse_ini_file(dirname(__FILE__) . '/../../configTmp/s2_tmp.ini');
+        $configs = [];
+        foreach ($res as $key => $line) {
+            $res[$key] = explode('/', $line);
+        }
+
+        $startTime = $res['start_trade_time'];
+        $iIDs = [];
+        foreach ($res['instrumnet_id'] as $iID) {
+            $iIDs[] = $iID;
+            $configs[$iID]['iID'] = $iID;
+            $configs[$iID]['stopTime'] = $res["stop_trade_time_{$iID}"];
+        }
+        foreach ($res['min_range'] as $i => $item) {
+            $configs[$iIDs[$i]]['minRange'] = $item;
+        }
+        foreach ($res['serial_kline'] as $i => $item) {
+            $configs[$iIDs[$i]]['serialKline'] = $item;
+        }
+        foreach ($res['k_range'] as $i => $item) {
+            $configs[$iIDs[$i]]['range'] = $item;
+        }
+        foreach ($res['peroid'] as $i => $item) {
+            $configs[$iIDs[$i]]['peroid'] = $item;
+        }
+        foreach ($res['threshold_t'] as $i => $item) {
+            $configs[$iIDs[$i]]['thresholdT'] = $item;
+        }
+        foreach ($res['threshold_v'] as $i => $item) {
+            $configs[$iIDs[$i]]['thresholdV'] = $item;
+        }
+        // return $configs;
+        $data['configs'] = $configs;
+        $data['iIDs'] = $iIDs;
+        $data['startTime'] = $startTime;
+        return view('ctp.config', $data);
+    });
+
+    Route::post('config', function() {
+        $_iIDs = $_POST['iIDs'];
+        $_iIDs = explode(',', $_iIDs);
+        $startTime = implode('/', $_POST['startTime']);
+        $del = isset($_POST['del']) ? $_POST['del'] : [];
+
+        $infos['instrumnet_id'] = [];
+        $stops = [];
+        foreach ($_iIDs as $id) {
+            if (isset($_POST[$id]) && !in_array($id, $infos['instrumnet_id']) && !in_array($id, $del)) {
+                $info = $_POST[$id];
+                $infos['instrumnet_id'][] = $info['iID'];
+                $infos['min_range'][] = $info['minRange'];
+                $infos['serial_kline'][] = $info['serialKline'];
+                $infos['k_range'][] = $info['range'];
+                $infos['peroid'][] = $info['peroid'];
+                $infos['threshold_t'][] = $info['thresholdT'];
+                $infos['threshold_v'][] = $info['thresholdV'];
+                $stops[$id] = implode('/', $info['stopTime']);
+            }
+        }
+
+        $res = parse_ini_file(dirname(__FILE__) . '/../../configTmp/s2_tmp.ini');
+
+        $res['start_trade_time'] = $startTime;
+        $res['instrumnet_id'] = implode('/', $infos['instrumnet_id']);
+        $res['min_range'] = implode('/', $infos['min_range']);
+        $res['serial_kline'] = implode('/', $infos['serial_kline']);
+        $res['k_range'] = implode('/', $infos['k_range']);
+        $res['peroid'] = implode('/', $infos['peroid']);
+        $res['threshold_t'] = implode('/', $infos['threshold_t']);
+        $res['threshold_v'] = implode('/', $infos['threshold_v']);
+        foreach ($stops as $iID => $item) {
+            $res['stop_trade_time_' . $iID] = $item;
+        }
+        $sort = ['history_back', '', 'is_dev', '', 'rds_db_online', 'mysql_db_online', 'mysql_host', '', 'k_line_service_id', 'trade_logic_service_id', 'trade_strategy_service_id', 'trade_service_id', '', 'root_path', 'flow_path_t', 'flow_path_m', 'log_path', 'pid_path', '', 'market_broker_id', 'market_user_id', 'market_password', 'market_front', '', 'trade_broker_id', 'trade_user_id', 'trade_password', 'trade_front', '', 'instrumnet_id', 'k_range', 'min_range', 'serial_kline', 'peroid', 'threshold_t', 'threshold_v', 'trade_timeout_sec', '', 'start_trade_time'];
+        $content = '';
+        foreach ($sort as $key) {
+            if ($key == '') {
+                $content .= PHP_EOL;
+                continue;
+            }
+            $content .= "{$key} = {$res[$key]}" . PHP_EOL;
+            unset($res[$key]);
+        }
+        foreach ($res as $key => $value) {
+            $content .= "{$key} = {$res[$key]}" . PHP_EOL;
+        }
+
+        file_put_contents(dirname(__FILE__) . '/../../configTmp/s2_tmp.ini', $content);
+        return redirect('config');
+    });
+
     Route::get('kline', function() {
+
+        $start = isset($_GET['startTime']) ? $_GET['startTime'] : date('Y-m-d H:i', strtotime('-1 day'));
+        $end = isset($_GET['endTime']) ? $_GET['endTime'] : date('Y-m-d H:i');
+        $type = isset($_GET['type']) ? $_GET['type'] : 'l';
+        $data['start'] = $start;
+        $data['end'] = $end;
+
+        $orderType = isset($_GET['order_type']) ? $_GET['order_type'] : 0;
+        $data['order_type'] = $orderType;
 
         $iID = isset($_GET['iID']) ? $_GET['iID'] : 'sn1609';
         $length = isset($_GET['l']) ? $_GET['l'] : 50;
@@ -29,7 +136,11 @@ Route::group(['middleware' => 'auth'], function() {
         $data['r'] = $krange;
         $data['iID'] = $iID;
 
-        $sql = "SELECT * FROM `kline` WHERE `instrumnet_id` = '{$iID}' AND `range` = {$krange} ORDER BY id DESC LIMIT {$length}";
+        if ($type == 'l') {
+            $sql = "SELECT * FROM `kline` WHERE `instrumnet_id` = '{$iID}' AND `range` = {$krange} ORDER BY id DESC LIMIT {$length}";
+        } else {
+            $sql = "SELECT * FROM `kline` WHERE `instrumnet_id` = '{$iID}' AND `range` = {$krange} AND `open_time` >= '{$start}' AND `close_time` <= '{$end}' ORDER BY id DESC";
+        }
         $kline = DB::connection('ctp_1')->select($sql);
         $kline = array_reverse($kline);
         foreach ($kline as $item) {
@@ -59,7 +170,8 @@ Route::group(['middleware' => 'auth'], function() {
         $data['krange'] = min($range);
         $data['index'] = $index;
         $data['dateTime'] = $dateTime;
-        // $index[] = -1;
+        $minTime = $kline[0]->open_time;
+        $index[] = -1;
 
         $inSQL = implode(',', $index);
         $sql = "SELECT
@@ -72,6 +184,7 @@ Route::group(['middleware' => 'auth'], function() {
             and m.instrumnet_id = o.instrumnet_id
             AND m.`instrumnet_id` = '{$iID}'
             AND m.`kindex` in ({$inSQL})
+            AND m.`mtime` > '{$minTime}'
             AND m.`krange` = {$krange}
             AND o.status = 1";
         $order = DB::connection('ctp_1')->select($sql);
@@ -79,6 +192,20 @@ Route::group(['middleware' => 'auth'], function() {
         if (count($order) == 0) {
             $data['error'] = 2;
             return view('ctp.kline', $data);
+        }
+
+        foreach ($order as $key => $item) {
+            $order[$key]->isFC = false;
+            if ($item->kindex == -1 && $item->status == 1) {
+                $sql = "SELECT * FROM `kline` WHERE `instrumnet_id` = '{$item->instrumnet_id}' AND `range` = {$krange} AND `open_time` < '{$item->srv_traded_time}' ORDER BY `id` DESC LIMIT 1";
+                $lastKline = DB::connection('ctp_1')->select($sql);
+                $lastKline = isset($lastKline[0]) ? $lastKline[0] : null;
+                if ($lastKline) {
+                    $order[$key]->kindex = $lastKline->index;
+                    $order[$key]->isFC = true;
+                }
+
+            }
         }
 
         // 交易盈亏
@@ -95,18 +222,25 @@ Route::group(['middleware' => 'auth'], function() {
                 $orderData[$i]['open_is_buy'] = $item->is_buy;
             } else {
                 $orderData[$i]['close_kindex'] = $item->kindex;
-                $orderData[$i]['close_price'] = $item->real_price;
+                $orderData[$i]['close_price'] = $item->real_price;// - Order::$commission[$item->instrumnet_id];
                 $orderData[$i]['close_is_buy'] = $item->is_buy;
                 if (isset($orderData[$i]['open_price'])) {
-                    if ($orderData[$i]['open_price'] > $orderData[$i]['close_price']) {
-                        $orderData[$i]['type'] = $orderData[$i]['close_is_buy'] ? 'up' : 'down';
-                    } else {
-                        $orderData[$i]['type'] = $orderData[$i]['close_is_buy'] ? 'down' : 'up';
+                    if ($orderData[$i]['open_kindex'] < $orderData[$i]['close_kindex']) {
+                        if ($orderType == 0) {
+                            $orderData[$i]['type'] = $orderData[$i]['close_is_buy'] ? 'down' : 'up';
+                        } else {
+                            if ($orderData[$i]['open_price'] > $orderData[$i]['close_price']) {
+                                $orderData[$i]['type'] = $orderData[$i]['close_is_buy'] ? 'up' : 'down';
+                            } else {
+                                $orderData[$i]['type'] = $orderData[$i]['close_is_buy'] ? 'down' : 'up';
+                            }
+                        }
                     }
                 }
                 $i++;
             }
         }
+
         $cPrice[] = 0;
         foreach ($orderData as &$item) {
             if (isset($item['open_kindex'])) {
@@ -222,10 +356,12 @@ Route::group(['middleware' => 'auth'], function() {
     Route::get('analysis', function() {
         $start = isset($_GET['startTime']) ? $_GET['startTime'] : date('Y-m-d H:i', strtotime('-1 day'));
         $end = isset($_GET['endTime']) ? $_GET['endTime'] : date('Y-m-d H:i');
+        $all = isset($_GET['all']) ? $_GET['all'] : 0;
         $minStart = '2016-06-29 09:00';
         if (strtotime($start) < strtotime($minStart)) $start = $minStart;
         $data['start'] = $start;
         $data['end'] = $end;
+        if ($all == 1) $start = $minStart;
         list($list) = (new Order)->getAll(0, $start, $end);
         $fList = [];
         $analysis = [];
@@ -294,12 +430,13 @@ Route::group(['middleware' => 'auth'], function() {
                     $openItem[$iid] = $item;
                 }
                 else {
-                    if (isset($isOpened[$iid]) && $isOpened[$iid])
+                    if (isset($isOpened[$iid]) && $isOpened[$iid]) {
                         $analysis[$iid]['group']++;
-                    $isOpened[$iid] = false;
-                    $p = $item['real_price'] - $openItem[$iid]['real_price'];
-                    $p = $item['is_buy'] ? -$p : $p;
-                    $analysis[$iid]['totalPrice'] += $p * Order::$priceRadio[$item['iid']];
+                        $isOpened[$iid] = false;
+                        $p = $item['real_price'] - $openItem[$iid]['real_price'];
+                        $p = $item['is_buy'] ? -$p : $p;
+                        $analysis[$iid]['totalPrice'] += $p * Order::$priceRadio[$item['iid']] - Order::$commission[$item['iid']];
+                    }
                 }
             }
             // 每根K线操作，用于计算详细
@@ -368,10 +505,23 @@ Route::group(['middleware' => 'auth'], function() {
             $tmp[] = "{$line['forecast_close']} / {$line['forecast_close_ok']} / {$p}";
             $p = $line['real_close'] > 0 ? number_format($line['real_close_ok'] / $line['real_close'], 3) * 100 . "%" : "-";
             $tmp[] = "{$line['real_close']} / {$line['real_close_ok']} / {$p}";
-            $fAnalysis[] = $tmp;
+            $fAnalysis[$iid] = $tmp;
         }
+        ksort($fAnalysis);
         $data['list'] = $fAnalysis;
         return view('ctp.analysis', $data);
+    });
+
+    Route::get('tick', function() {
+        $iid = $_GET['iid'];
+        $end = time();
+        $start = $end - 1;
+        $start = date('Y-m-d H:i:s', $start);
+        $end = date('Y-m-d H:i:s', $end);
+        $start = '2016-06-30 14:59:58';
+        $sql = "SELECT * FROM `tick` WHERE `time` >= '{$start}' AND `time` <= '{$end}' AND `instrumnet_id` = '{$iid}'";
+        $list = DB::select($sql);
+        return $list;
     });
 
 });

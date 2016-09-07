@@ -12,18 +12,22 @@ class Order extends Model
 
     public static $commission = [
         'sn1609' => 3.9,
-        'hc1610' => 5.12,
-        'SR609' => 3.1,
-        'zn1608' => 3.1,
+        'hc1610' => 6,
+        'SR701' => 3.81,
+        'SR609' => 3.81,
+        'zn1609' => 3.1,
         'cu1608' => 9.5,
+        'ag1612' => 8.5,
     ];
 
     public static $priceRadio = [
         'sn1609' => 1,
         'hc1610' => 10,
-        'SR609' => 10,
-        'zn1608' => 5,
+        'SR701' => 10,
+        'zn1609' => 5,
+        'SR609' => 3.81,
         'cu1608' => 5,
+        'ag1612' => 15,
     ];
 
     public function getAll($page = 1, $start = null, $end = null, $iID = null, $range = null)
@@ -52,7 +56,7 @@ class Order extends Model
         $end = $end;
 
         $sql = "SELECT
-            m.order_id, m.instrumnet_id, m.kindex, m.krange, o.is_buy, o.is_open, m.is_forecast, m.is_zhuijia, o.srv_insert_time, o.srv_traded_time, o.start_time, o.start_usec, o.first_time, o.first_usec, o.end_time, o.end_usec, o.price, o.real_price, m.cancel_type, o.status, o.session_id, o.front_id, o.order_ref, o.cancel_tick_price
+            m.order_id, m.instrumnet_id, m.kindex, m.krange, o.is_buy, o.is_open, m.is_forecast, m.is_zhuijia, o.srv_insert_time, o.srv_traded_time, o.start_time, o.start_usec, o.first_time, o.first_usec, o.end_time, o.end_usec, o.price, o.real_price, m.cancel_type, o.status, o.session_id, o.front_id, o.order_ref, o.cancel_tick_price, o.srv_end_time
         FROM
             markov_kline_order as m,
             `order` as o
@@ -91,28 +95,52 @@ class Order extends Model
             $tmp[] = $line->is_buy ? 'buy' : 'sell';
             $tmp[] = $line->is_open ? 'kai' : 'ping';
             $tmp[] = $line->is_forecast ? '预测单' : ($line->is_zhuijia ? '追价单' : ($line->kindex == -1 ? '强平单' : '实时单'));
-            $tmp[] = $line->start_time;
-            $tmp[] = $line->end_time;
+            $tmp[] = $line->srv_insert_time;
+            $tmp[] = $line->srv_traded_time == '0000-00-00 00:00:00' ? $line->srv_end_time : $line->srv_traded_time;
             $tmp[] = $line->price;
             $tmp[] = $line->real_price == 0 ? $line->cancel_tick_price : $line->real_price;
             $tmp[] = $line->status == 1 ? 1 : 0;
             $tmp[] = $line->status != 1 ? 1 : 0;
-            if ($line->is_open && $line->status == 1) {
-                $openPrice[$line->instrumnet_id] = $line->real_price;
-            }
-            if (!$line->is_open && $line->status == 1) {
-                $p = $line->real_price - $openPrice[$line->instrumnet_id];
-                if ($line->is_buy) $p *= -1;
-                $p = $p * self::$priceRadio[$line->instrumnet_id];
-                $p = $p - self::$commission[$line->instrumnet_id];
-                $tmp[] = $p;
-                $totalPrice[$line->instrumnet_id] = isset($totalPrice[$line->instrumnet_id]) ? $totalPrice[$line->instrumnet_id] + $p : $p;
-                $tmp[] = self::$commission[$line->instrumnet_id];
-                $openPrice[$line->instrumnet_id] = 0;
+            if ($line->status == 1) {
+                if ($line->is_open) {
+                    $isOpened[$line->instrumnet_id] = true;
+                    $openItem[$line->instrumnet_id] = $line;
+                    $tmp[] = 0;
+                    $tmp[] = 0;
+                }
+                else if (isset($isOpened[$line->instrumnet_id])){
+                    $p = $line->real_price - $openItem[$line->instrumnet_id]->real_price;
+                    $p = $line->is_buy ? -$p : $p;
+                    $p = $p * self::$priceRadio[$line->instrumnet_id];
+                    $p -= self::$commission[$line->instrumnet_id];
+                    $totalPrice[$line->instrumnet_id] = isset($totalPrice[$line->instrumnet_id]) ? $totalPrice[$line->instrumnet_id] + $p : $p;
+                    $tmp[] = $p;
+                    $tmp[] = self::$commission[$line->instrumnet_id];
+                } else {
+                    $tmp[] = 0;
+                    $tmp[] = 0;
+                }
             } else {
                 $tmp[] = 0;
                 $tmp[] = 0;
             }
+
+            // if ($line->is_open && $line->status == 1) {
+            //     $openPrice[$iid] = $line->real_price;
+            // }
+            // if (!$line->is_open && $line->status == 1) {
+            //     $p = $line->real_price - $openPrice[$line->instrumnet_id];
+            //     if ($line->is_buy) $p *= -1;
+            //     $p = $p * self::$priceRadio[$line->instrumnet_id];
+            //     $p = $p - self::$commission[$line->instrumnet_id];
+            //     $tmp[] = $p;
+            //     $totalPrice[$line->instrumnet_id] = isset($totalPrice[$line->instrumnet_id]) ? $totalPrice[$line->instrumnet_id] + $p : $p;
+            //     $tmp[] = self::$commission[$line->instrumnet_id];
+            //     $openPrice[$line->instrumnet_id] = 0;
+            // } else {
+            //     $tmp[] = 0;
+            //     $tmp[] = 0;
+            // }
 
             $startTime = strtotime($line->start_time) * 1000000 + $line->start_usec;
             $firstTime = strtotime($line->first_time) * 1000000 + $line->first_usec;

@@ -27,7 +27,7 @@ class Authenticate
         if (!isset($_SESSION['login'])) {
             return redirect('/');
         }
-
+        $_SESSION['db'] = env('DB_DATABASE_CTP');
         return $next($request);
     }
 }

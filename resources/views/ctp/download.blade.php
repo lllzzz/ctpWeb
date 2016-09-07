@@ -54,17 +54,11 @@
     </div>
 
 </form>
+<script src="/js/config.js"></script>
 <script type="text/javascript">
     $(".form_datetime").datetimepicker({format: 'yyyy-mm-dd hh:ii'});
-    var iIDRange = {
-        '':[0],
-        'sn1609': [80],
-        'SR609': [6],
-        'cu1608': [60],
-        'hc1610': [8],
-        'zn1608': [30],
-    };
 
+    iIDRange[''] = [0];
 
     for (iID in iIDRange) {
 

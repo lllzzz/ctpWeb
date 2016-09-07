@@ -41,8 +41,12 @@
             <li id='kline'><a href="/kline">Kline</a></li>
             <li id='analysis'><a href="/analysis">Analysis</a></li>
             <li id='download'><a href="/download">Download</a></li>
+            <li id='config'><a href="/config">Config</a></li>
           </ul>
           <ul class="nav navbar-nav navbar-right">
+            {{-- <li>{{$_SESSION['db']}}</li> --}}
+            <li @if ($_SESSION['db'] == 'ctp_1') class="active" @endif><a href="#" id='ctp_1' >实盘</a></li>
+            <li @if ($_SESSION['db'] == 'ctp_dev') class="active" @endif><a href="#" id='ctp_dev' >仿真</a></li>
             <li><a href="/logout">Sign Out</a></li>
           </ul>
         </div><!--/.nav-collapse -->
@@ -62,6 +66,16 @@
 
     <script>
       $('#@yield("action")').addClass('active');
+      $('#ctp_1').click(function() {
+        $.get('/changeDB?db=1', function() {
+          location.reload();
+        })
+      })
+      $('#ctp_dev').click(function() {
+        $.get('/changeDB?db=dev', function() {
+          location.reload()
+        })
+      })
     </script>
   </body>
 </html>
