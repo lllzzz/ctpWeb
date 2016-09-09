@@ -22,7 +22,7 @@ Route::group(['middleware' => 'auth'], function() {
 
     Route::get('changeDB', function() {
         $db = $_GET['db'];
-        $cmd = "cp /home/dev/source/ctpWeb/.env_{$db} /home/dev/source/ctpWeb/.env";
+        $cmd = "cp /home/dev/src/ctp/ctpWeb/.env_{$db} /home/dev/src/ctp/ctpWeb/.env";
         system($cmd);
     });
 
@@ -343,7 +343,7 @@ Route::group(['middleware' => 'auth'], function() {
 
         $file = $type . "_" . str_replace([' ', ':', '-'], '', $start) . "_" . str_replace([' ', ':', '-'], '', $end);
 
-        $filePath = '/home/dev/source/ctpWeb/public/runtime/' . $file . ".csv";
+        $filePath = '/home/dev/src/ctp/ctpWeb/public/runtime/' . $file . ".csv";
         $fp = fopen($filePath, 'w');
         foreach ($list as $fields) {
             // fputcsv($fp, $fields);

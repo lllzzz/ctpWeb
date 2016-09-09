@@ -13,6 +13,7 @@ class Order extends Model
     public static $commission = [
         'sn1609' => 3.9,
         'hc1610' => 6,
+        'hc1701' => 6,
         'SR701' => 3.81,
         'SR609' => 3.81,
         'zn1609' => 3.1,
@@ -23,6 +24,7 @@ class Order extends Model
     public static $priceRadio = [
         'sn1609' => 1,
         'hc1610' => 10,
+        'hc1701' => 10,
         'SR701' => 10,
         'zn1609' => 5,
         'SR609' => 3.81,
